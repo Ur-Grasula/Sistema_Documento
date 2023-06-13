@@ -28,7 +28,7 @@
                                 <td>{{ $documento->updated_at }}</td>
 
                                 <td>
-                                    <form action="{{ Route('download', [$documento->id]) }}" method="post">
+                                    <form action="{{ Route('documento_download', [$documento->id]) }}" method="post">
                                         @csrf
                                         <input type="hidden" name="id" value="{{ $documento->id }}">
                                         <input class="btn btn-primary" type="submit" value="Download">
@@ -36,7 +36,7 @@
                                 </td>
 
                                 <td>
-                                    <form action="{{ Route('update', [$documento->id]) }}" method="get">
+                                    <form action="{{ Route('documento_update', [$documento->id]) }}" method="get">
                                         @csrf
                                         <input type="hidden" name="id" value="{{ $documento->id }}">
                                         <input class="btn btn-primary" type="submit" value="Alterar">
@@ -44,7 +44,7 @@
                                 </td>
 
                                 <td>
-                                    <form action="{{ Route('delete', [$documento->id]) }}" method="post">
+                                    <form action="{{ Route('documento_delete', [$documento->id]) }}" method="post">
                                         @csrf
                                         <input type="hidden" name="id" value="{{ $documento->id }}">
                                         <input class="btn btn-primary" type="submit" value="Excluir">

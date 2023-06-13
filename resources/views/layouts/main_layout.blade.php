@@ -19,10 +19,10 @@
 
                 <ul class="nav">
                     <li class="nav-item">
-                        <a class="nav-link active" aria-current="page" href="{{ Route('listar') }}">Listar</a>
+                        <a class="nav-link active" aria-current="page" href="{{ Route('documento_read') }}">Listar</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ Route('upload') }}">Upload</a>
+                        <a class="nav-link" href="{{ Route('documento_upload') }}">Upload</a>
                     </li>
                 </ul>
 

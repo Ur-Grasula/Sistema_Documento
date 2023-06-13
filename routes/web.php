@@ -18,22 +18,23 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', [Documento_Controller::class, 'Index'])->name('home');
 
 
-// ROTA DE LISTAGEM
-Route::get('/Listar', [Documento_Controller::class, 'Listar'])->name('listar');
+// ROTA DE LISTAGEM DE DOCUMENTO
+Route::get('/Documento_Read', [Documento_Controller::class, 'View_Documento_Read'])->name('documento_read');
 
-// ROTA DE DONWLOAD
-Route::match(['get', 'post'], '/Download/{id}', [Documento_Controller::class, 'Download'])->name('download');
+// ROTA DE DONWLOAD DE DOCUMENTO
+Route::match(['get', 'post'], '/Documento_Download/{id}', [Documento_Controller::class, 'View_Documento_Download'])->name('documento_download');
 
-// ROTA DE UPLOAD
-Route::get('/Upload', [Documento_Controller::class, 'Upload'])->name('upload');
-Route::match(['get', 'post'], '/Upload_Submit', [Documento_Controller::class, 'Upload_Submit_Validate'])->name('upload_submit');
+// ROTA DE UPLOAD DE DOCUMENTO
+Route::get('/Documento_Upload', [Documento_Controller::class, 'View_Documento_Upload'])->name('documento_upload');
+Route::match(['get', 'post'], '/Documento_Upload_Validate', [Documento_Controller::class, 'View_Documento_Upload_Validate'])->name('documento_upload_validate');
 
-// ROTA DE DELETE
-Route::match(['get', 'post'], 'Delete/{id}', [Documento_Controller::class, 'Delete'])->name('delete');
+// ROTA DE DELETE DE DOCUMENTO
+Route::match(['get', 'post'], 'Documento_Delete/{id}', [Documento_Controller::class, 'View_Documento_Delete'])->name('documento_delete');
 
-// ROTA AUTO UPDATE
-Route::match(['get', 'post'], '/Update/{id}', [Documento_Controller::class, 'Update'])->name('update');
-Route::match(['get', 'post'], '/Update_Submit/{id}', [Documento_Controller::class, 'Update_Submit_Validate'])->name('update_submit');
+// ROTA DE UPDATE DE DOCUMENTO
+Route::match(['get', 'post'], '/Documento_Update/{id}', [Documento_Controller::class, 'View_Documento_Update'])->name('documento_update');
+Route::match(['get', 'post'], '/Documento_Update_validate/{id}', [Documento_Controller::class, 'View_Documento_Update_Validate'])->name('documento_update_validate');
 
 // ROTA DE PESQUISA
+// NOTA - ROTA NECESSARIO ?
 Route::get('/Search', [Documento_Controller::class, 'Search'])->name('search');

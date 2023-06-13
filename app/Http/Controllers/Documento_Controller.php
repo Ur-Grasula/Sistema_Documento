@@ -6,250 +6,306 @@ use App\Models\Documento;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use League\CommonMark\Node\Block\Document;
 
 class Documento_Controller extends Controller
 {
+    // CRUDL ===================================================================================
 
-    // FUNÇÃO UTILIZADA PARA TESTE RAPIDO
-    public function Index(Request $request)
-    {
-
-        // TESTE DE DEFINÇÃO DE HORARIO
-        // date_default_timezone_set('America/Sao_Paulo');
-
-        // echo "HORARIO NOW(): ".NOW();
-        // echo "<p>";
-        // echo "HORARIO CARBON NOW(): ".Carbon::NOW();
-        // echo "<p>";
-        // echo "HORARIO DATE: ".DATE('Y-m-d H:i:s');
-
-        return redirect()->route('listar');
-    }
-
-    // FUNÇÃO RESPONSAVEL POR LISTAR DOCUMENTOS
-    public function Listar()
-    {
-        $data[] = [];
-
-        try {
-
-            if (Documento::count() >= 1) {
-                $registro = Documento::count();
-                $data = Documento::orderBy('created_at', 'DESC')->get();
-            } else {
-                $registro = Documento::count();
-            }
-
-            return view('listar', ["data" => $data, "registro" => $registro]);
-        } catch (\Exception $exception) {
-            // return $exception->getMessage();
-            abort(404);
-        }
-
-        return view('listar', ["data" => $data, "registro" => $registro]);
-    }
-
-    // FUNÇÃO RESPONSAVEL PELO DOWNLOAD DO DOCUMENTO
-    public function Download(Request $request, int $id)
+    // FUNÇÃO RESPONSAVEL POR SALVAR DADOS NO BANCO DE DADOS
+    private function Create_Documento(string $nome, string $nome_documento, string $extensao)
     {
         try {
-            if ($request->isMethod('post')) {
-                if (Documento::Where('id', '=', $id)->count() == 1) {
-                    $data = Documento::Where('id', '=', $id)->get();
-                    $nome = $data[0]['nome'];
-                    $extensao = $data[0]['extensao'];
-                    $documento = $data[0]['documento'];
-                    return Storage::disk('documento')->Download($documento, $nome . '.' . $extensao);
-                }
-            } else {
-                return redirect()->route('listar');
-            }
-        } catch (\Exception $exception) {
-            abort(404);
-        }
-    }
-
-    // FUNÇÃO RESPONSAVEL POR EXIBIR FORMULARIO DE UPLOAD DE ARQUIVOS
-    public function Upload()
-    {
-        return view('formulario_upload');
-    }
-
-    // FUNÇÃO RESPONSAVEL POR VALIDAR DADOS DE UPLOAD
-    public function Upload_Submit_Validate(Request $request)
-    {
-        try {
-
-            if ($request->isMethod('post')) {
-
-                $request->validate([
-                    'text_nome' => ['required', 'min:3', 'max:50'],
-                    'documento' => ['required', 'mimes:ods,txt'],
-                ], [
-                    'text_nome.required' => "Campo nome Obrigatorio.",
-                    'text_nome.min' => "Campo nome precisa ter pelo menos 3 catacteres.",
-                    'text_nome.max' => "Campo nome pode ter no maximo 40 catacteres.",
-
-                    'documento.required' => "Nenhum arquivo selecionado.",
-                    'documento.mimes' => "O arquivo precisa ser do tipo (ods,txt).",
-                ]);
-
-                $nome = $request->input('text_nome');
-                $file = $request->file('documento');
-                $extensao = $request->file('documento')->getClientOriginalExtension();
-                $nome_documento = Carbon::NOW()->format('Y-m-d-H-i-s-a') . rand() . "." . $extensao;
-
-                return $this->Upload_Submit_Data($nome, $file, $extensao, $nome_documento);
-            } else {
-                return redirect()->route('upload');
-            }
-        } catch (\Exception $exception) {
-            abort(404);
-        }
-    }
-
-    // FUNÇÃO RESPONSAVEL PELO UPLOAD DE DADOS
-    public function Upload_Submit_Data(string $nome, $file, string $extensao, string $nome_documento)
-    {
-        try {
-            // GRAVAR DADOS NO BANCO DE DADOS
             $documento = new Documento;
             $documento->nome = $nome;
             $documento->documento = $nome_documento;
             $documento->extensao = $extensao;
             $documento->created_at = Carbon::NOW();
             $documento->updated_at = Carbon::NOW();
-
-            if ($documento->save()) {
-                // GRAVAR ARQUIVO NA PASTA
-                if ($file->storeAs('', $nome_documento, ['disk' => 'documento'])) {
-                    return redirect()->route('listar');
-                }
-            }
+            $documento->save();
         } catch (\Exception $exception) {
-            abort(404);
+            $erro_code = $exception->getCode();
+            abort(404, $erro_code . " | Erro ao tentar salvar dados no banco de dados");
         }
     }
 
-    // FUNÇÃO RESPONSAVAVEL POR DELETAR DADOS E ARQUIVO
-    public function Delete(Request $request, int $id)
+    // FUNÇÃO RESPONSAVEL POR BUSCAR DADOS NO BANCO DE DADOS
+    private function Read_Documento($id)
     {
         try {
+            $data['registro'] = Documento::count();
+            $data['documento'] = Documento::find($id);
+            return $data;
+        } catch (\Exception $exception) {
+            $erro_code = $exception->getCode();
+            abort(404, $erro_code . " | Erro ao tentar recuperar dados ");
+        }
+    }
 
-            if ($request->isMethod('post')) {
+    // FUNÇÃO RESPONSAVEL POR ALTERAR DADOS NO BANCO DE DADOS
+    private function Update_Documento($data_update)
+    {
+        try {
+            $documento = Documento::find($data_update['id']);
+            $documento->nome = $data_update['nome'];
 
-                if (Documento::where('id', '=', $id)->count() == 1) {
-                    $data = Documento::where('id', '=', $id)->get();
-                    foreach ($data as $documento) {
+            if (isset($data_update['documento']) && isset($data_update['extensao'])) {
+                $documento->documento = $data_update['documento'];
+                $documento->extensao = $data_update['extensao'];
+            }
 
-                        // DELETAR ARQUIVO
-                        Storage::disk('documento')->delete($documento->documento);
+            $documento->Updated_at = Carbon::NOW();
+            $documento->save();
+        } catch (\Exception $exception) {
+            $erro_code = $exception->getCode();
+            abort(404, $erro_code . " | Erro ao tentar recuperar dados  ");
+        }
+    }
 
-                        // DELETAR DADOS DO BANCO DE DADOS
-                        $data = Documento::find($id);
-                        $data->delete();
+    // FUNÇÃO RESPONSAVEL POR DELETAR DADOS NO BANCO DE DADOS
+    private function Delete_Documento(int $id)
+    {
+        try {
+            $data = Documento::find($id);
+            $data->delete();
+        } catch (\Exception $exception) {
+            $erro_code = $exception->getCode();
+            abort(404, $erro_code . " | Erro ao tentar deletar dados ");
+        }
+    }
 
-                        return redirect()->route('listar');
-                    }
-                }
-            } else {
-                return redirect()->route('listar');
+    private function List_Documento()
+    {
+        try {
+            $data['registro'] = Documento::count();
+            $data['documento'] = Documento::orderBy('created_at', 'DESC')->get();
+            return $data;
+        } catch (\Exception $exception) {
+            $erro_code = $exception->getCode();
+            abort(404, $erro_code . " | Erro ao tentar recuperar dados ");
+        }
+    }
+
+    // CONTROLE DE DOCUMENTO ===================================================================
+
+    // FUNÇÃO RESPONSAVEL POR GERAR NOME PARA O DOCUMENTO
+    public function Gerar_Nome_Documento($file)
+    {
+        $extensao = $file->getClientOriginalExtension();
+
+        try {
+            do {
+                $nome_documento = Carbon::NOW()->format('Y-m-d-H-i-s-a') . rand() . "." . $extensao;
+            } while (Documento::where('documento', '=', $nome_documento)->count() >= 1);
+
+            $nome_documento = [
+                'nome_documento' => $nome_documento,
+                'extensao' => $extensao
+            ];
+
+            return $nome_documento;
+        } catch (\Exception $exception) {
+            $erro_code = $exception->getCode();
+            abort(404, $erro_code . " | Erro ao tentar gerar nome para documento documento ");
+        }
+    }
+
+    // FUNÇÃO RESPONSAVEL POR SALVAR DOCUMENTO NA PASTA
+    public function Salvar_Documento(string $nome_documento, $file)
+    {
+        try {
+            $file->storeAs('', $nome_documento, ['disk' => 'documento']);
+        } catch (\Exception $exception) {
+            $erro_code = $exception->getCode();
+            abort(404, $erro_code . " | Erro ao tentar armazenar documento ");
+        }
+    }
+
+    // FUNÇÃO RESPONSAVEL POR DELETAR DOCUMENTO DA PASTA
+    // NOTA - MENSAGEM DE ERRO NÃO SENDO RETORNADA
+    public function Excluir_Documento(int $id)
+    {
+        try {
+            if (Documento::where('id', '=', $id)->count() == 1) {
+
+                $documento = Documento::where('id', '=', $id)->value('documento');
+                Storage::disk('documento')->delete($documento);
             }
         } catch (\Exception $exception) {
-            abort(404);
+            $erro_code = $exception->getCode();
+            abort(404, $erro_code . " | Erro ao tentar excluir documento ");
+        }
+    }
+
+    // FUNÇÃO RESPONSAVEL POR FAZER DOWNLOAD DO DOCUMENTO
+    public function Download_Documento(int $id)
+    {
+        try {
+            if (Documento::Where('id', '=', $id)->count() == 1) {
+                $data = Documento::Where('id', '=', $id)->get();
+                $nome = $data[0]['nome'];
+                $extensao = $data[0]['extensao'];
+                $documento = $data[0]['documento'];;
+                return Storage::disk('documento')->Download($documento, $nome . '.' . $extensao);
+            }
+        } catch (\Exception $exception) {
+            $erro_code = $exception->getCode();
+            abort(404, $erro_code . " | Erro ao tentar fazer download de documento ");
+        }
+    }
+
+    // VIEWS ===================================================================================
+
+    // FUNÇÃO UTILIZADA PARA TESTE RAPIDO
+    public function Index()
+    {
+        return redirect()->route('documento_read');
+    }
+
+    // FUNÇÃO RESPONSAVEL POR RETORNAR DOCUMENTOS PARA VIEW
+    public function View_Documento_Read()
+    {
+        $data =  $this->List_Documento();
+        return view('documento_read', ['data' => $data['documento'], 'registro' => $data['registro']]);
+    }
+
+    // FUNÇÃO RESPONSAVEL POR INCIAR DOWNLOAD
+    public function View_Documento_Download(Request $request, int $id)
+    {
+        if ($request->isMethod('post')) {
+            return $this->Download_Documento($id);
+        } else {
+            return redirect()->route('documento_read');
+        }
+    }
+
+    // FUNÇÃO RESPONSAVEL POR EXIBIR FORMULARIO DE UPLOAD DE DOCUMENTO
+    public function View_Documento_Upload()
+    {
+        return view('documento_formulario_upload');
+    }
+
+    // FUNÇÃO RESPONSAVEL POR VALIDAR DADOS DE UPLOAD DE DOCUMENTO
+    public function View_Documento_Upload_Validate(Request $request)
+    {
+        if ($request->isMethod('post')) {
+
+            $request->validate([
+                'text_nome' => ['required', 'min:3', 'max:50'],
+                'documento' => ['required', 'mimes:ods,txt'],
+            ], [
+                'text_nome.required' => "Campo nome Obrigatorio.",
+                'text_nome.min' => "Campo nome precisa ter pelo menos 3 catacteres.",
+                'text_nome.max' => "Campo nome pode ter no maximo 40 catacteres.",
+
+                'documento.required' => "Nenhum arquivo selecionado.",
+                'documento.mimes' => "O arquivo precisa ser do tipo (ods,txt).",
+            ]);
+
+            $nome = $request->input('text_nome');
+            $file = $request->file('documento');
+
+            $documento = $this->Gerar_Nome_Documento($file);
+
+            $nome_documento = $documento['nome_documento'];
+            $extensao = $documento['extensao'];
+
+            $this->Create_Documento($nome, $nome_documento, $extensao);
+            $this->Salvar_Documento($nome_documento, $file);
+
+            return redirect()->route('documento_read');
+        } else {
+            return redirect()->route('documento_read');
+        }
+    }
+
+    // FUNÇÃO RESPONSAVAVEL POR DELETAR DADOS E DOCUMENTO
+    public function View_Documento_Delete(Request $request, int $id)
+    {
+        if ($request->isMethod('post')) {
+
+            // DELETAR DOCUMENTO
+            $this->Excluir_Documento($id);
+
+            // DELETAR DADOS DO BANCO DE DADOS
+            $this->Delete_Documento($id);
+
+            return redirect()->route('documento_read');
+        } else {
+            return redirect()->route('documento_read');
         }
     }
 
     //FUNÇÃO RESPONSAVEL PELO FORMULARIO DE UPDATE
-    public function Update(Request $request, int $id)
+    public function View_Documento_Update(Request $request, int $id)
     {
-        try {
+        if ($request->isMethod('get')) {
 
-            if ($request->isMethod('get')) {
+            $data = $this->Read_Documento($id);
+            $data = $data['documento'];
 
-                if (Documento::Where('id', '=', $id)->count() == 1) {
-                    $data = Documento::Where('id', '=', $id)->get();
-                    return view('formulario_update', ["data" => $data]);
-                } else {
-                    return redirect()->route('listar');
-                }
-            } else {
-                return redirect()->route('listar');
-            }
-        } catch (\Exception $exception) {
-            abort(404);
+            return view('documento_formulario_update', ["data" => $data]);
+        } else {
+            return redirect()->route('documento_read');
         }
     }
 
     // FUNÇÃO RESPONSAVEL POR VALIDAR DADOS DE UPDATE
-    public function Update_Submit_Validate(Request $request, int $id)
+    public function View_Documento_Update_Validate(Request $request, int $id)
     {
-        try {
-            if ($request->isMethod('post')) {
+        if ($request->isMethod('post')) {
 
-                $request->validate([
-                    'text_nome' => ['required', 'min:3', 'max:50'],
-                    'documento' => ['mimes:ods,txt'],
-                ], [
-                    'text_nome.required' => "Campo nome Obrigatorio.",
-                    'text_nome.min' => "Campo nome precisa ter pelo menos 3 catacteres.",
-                    'text_nome.max' => "Campo nome pode ter no maximo 40 catacteres.",
+            $request->validate([
+                'text_nome' => ['required', 'min:3', 'max:50'],
+                'documento' => ['mimes:ods,txt'],
+            ], [
+                'text_nome.required' => "Campo nome Obrigatorio.",
+                'text_nome.min' => "Campo nome precisa ter pelo menos 3 catacteres.",
+                'text_nome.max' => "Campo nome pode ter no maximo 40 catacteres.",
 
-                    'documento.mimes' => "O arquivo precisa ser do tipo (ods,txt).",
-                ]);
+                'documento.mimes' => "O arquivo precisa ser do tipo (ods,txt).",
+            ]);
 
-                $nome = $request->input('text_nome');
-                $file = $request->file('documento');
-
-                return $this->Update_Submit_Data($id, $nome, $file);
-            } else {
-                return  redirect()->route('listar');
-            }
-        } catch (\Exception $exception) {
-            abort(404);
-        }
-    }
-
-    // FUNÇÃO RESPONSAVEL PELO UPDATE DE DATA
-    public function Update_Submit_Data(int $id, string $nome, $file)
-    {
-        try {
-            // SALVAR NO BANCO DE DADOS
-            $documento = Documento::find($id);
-            $documento->nome = $nome;
+            $nome = $request->input('text_nome');
+            $file = $request->file('documento');
+            $nome_documento = null;
+            $extensao = null;
 
             if (isset($file)) {
 
-                // GRAVA O NOME DO DOCUMENTO ANTIGO
-                $documento_antigo = $documento->documento;
+                // DELETAR DOCUMENTO ANTIGO
+                $this->Excluir_Documento($id);
 
-                // GERAR NOME PARA O DOCUMENTO
-                $extensao = $file->getClientOriginalExtension();
-                $nome_documento = Carbon::NOW()->format('Y-m-d-H-i-s-a') . rand() . "." . $extensao;
-
-                $documento->documento = $nome_documento;
-                $documento->extensao = $extensao;
+                // GERAR NOME PARA NOVO DOCUMENTO
+                $documento = $this->Gerar_Nome_Documento($file);
+                $nome_documento = $documento['nome_documento'];
+                $extensao = $documento['extensao'];
             }
 
-            $documento->updated_at = Carbon::NOW();
+            // PREPARA PARAMETROS EM ARRAY
+            $data_update = [
+                'id' => $id,
+                'nome' => $nome,
+                'documento' => $nome_documento,
+                'extensao' => $extensao,
+            ];
 
-            if ($documento->save() && isset($file)) {
+            // ATUALIZA DADOS NO BANCO DE DADOS
+            $this->Update_Documento($data_update);
 
-                // EXCLUI DOCUMENTO ANTIGO
-                Storage::disk('documento')->delete($documento_antigo);
-
-                // GRAVAR NOVO DOCUMENTO NA PASTA
-                if ($file->storeAs('', $nome_documento, ['disk' => 'documento'])) {
-                    return redirect()->route('listar');
-                }
+            // SALVA NOVO DOCUMENTO NA PASTA
+            if (isset($file)) {
+                $this->Salvar_Documento($nome_documento, $file);
             }
-            return redirect()->route('listar');
-        } catch (\Exception $exception) {
-            abort(404);
+
+            return redirect()->route('documento_read');
+        } else {
+            return  redirect()->route('documento_read');
         }
     }
 
     // FUNÇÃO RESPONSAVEL POR PESQUISAR DADOS
+    // NOTA - ADICONAR METODO AO CRUD DE READ PARAMETRO NOME
     public function Search(Request $request)
     {
         try {
@@ -267,7 +323,7 @@ class Documento_Controller extends Controller
 
                 return view('search', ["data" => $data, "registro" => $registro]);
             } else {
-                return redirect()->route('listar');
+                return redirect()->route('documento_read');
             }
         } catch (\Exception $exception) {
             abort(404);
